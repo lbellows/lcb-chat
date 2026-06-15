@@ -1,0 +1,18 @@
+services:
+  chat:
+    image: ghcr.io/lbellows/lcb-chat:latest
+    container_name: lcb-chat
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "3000:3000"
+    environment:
+      # SQLite database lives on the named volume below, so messages survive
+      # image updates and container replacement. The DB is NEVER baked into the
+      # image — it only exists on this volume on the server.
+      DB_PATH: /data/chat.db
+    volumes:
+      - chat-data:/data
+
+volumes:
+  chat-data:
