@@ -48,6 +48,22 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    if (msg.type === "typing") {
+      if (!ws.username) return; // must join first
+      // Relay to everyone else; don't echo back to the sender.
+      const payload = JSON.stringify({
+        type: "typing",
+        username: ws.username,
+        state: msg.state === true,
+      });
+      for (const client of wss.clients) {
+        if (client !== ws && client.readyState === client.OPEN) {
+          client.send(payload);
+        }
+      }
+      return;
+    }
+
     if (msg.type === "message") {
       if (!ws.username) return; // must join first
       const text = String(msg.text || "").trim().slice(0, MAX_MESSAGE);

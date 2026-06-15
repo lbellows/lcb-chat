@@ -146,6 +146,14 @@ header .status {
   border: none;
 }
 
+.typing {
+  padding: 0 1rem 0.4rem;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--muted);
+  min-height: 1.1rem;
+}
+
 #message-form {
   display: flex;
   gap: 0.5rem;

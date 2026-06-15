@@ -11,6 +11,7 @@ const els = {
   loadMore: document.getElementById("load-more"),
   messageForm: document.getElementById("message-form"),
   messageInput: document.getElementById("message-input"),
+  typing: document.getElementById("typing"),
 };
 
 let username = localStorage.getItem("username") || "";
@@ -125,6 +126,9 @@ function connect() {
       renderMessage(msg);
       if (oldestId === null) oldestId = msg.id;
       if (atBottom) els.messages.scrollTop = els.messages.scrollHeight;
+      setTyping(msg.username, false); // they just sent, so they stopped typing
+    } else if (msg.type === "typing") {
+      setTyping(msg.username, msg.state);
     }
   });
 
@@ -136,13 +140,67 @@ function connect() {
   ws.addEventListener("error", () => ws.close());
 }
 
+// ---- Typing indicator ----
+// Map of username -> timeout id; presence means "currently typing".
+const typers = new Map();
+
+function renderTypers() {
+  const names = [...typers.keys()];
+  if (!names.length) {
+    els.typing.classList.add("hidden");
+    els.typing.textContent = "";
+    return;
+  }
+  let label;
+  if (names.length === 1) label = `${names[0]} is typing…`;
+  else if (names.length === 2) label = `${names[0]} and ${names[1]} are typing…`;
+  else label = "Several people are typing…";
+  els.typing.textContent = label;
+  els.typing.classList.remove("hidden");
+}
+
+function setTyping(name, on) {
+  if (!name || name === username) return;
+  clearTimeout(typers.get(name));
+  if (on) {
+    // Auto-clear if no refresh arrives (covers dropped "stopped" events).
+    typers.set(name, setTimeout(() => setTyping(name, false), 5000));
+  } else {
+    typers.delete(name);
+  }
+  renderTypers();
+}
+
 // ---- Sending ----
+let lastTypingSent = 0;
+
+function sendTyping(state) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "typing", state }));
+}
+
+els.messageInput.addEventListener("input", () => {
+  if (!els.messageInput.value) {
+    sendTyping(false);
+    lastTypingSent = 0;
+    return;
+  }
+  // Throttle "typing" pings to at most one every 2s.
+  const now = Date.now();
+  if (now - lastTypingSent > 2000) {
+    sendTyping(true);
+    lastTypingSent = now;
+  }
+});
+
 els.messageForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = els.messageInput.value.trim();
   if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify({ type: "message", text }));
   els.messageInput.value = "";
+  sendTyping(false);
+  lastTypingSent = 0;
 });
 
 // ---- Boot ----
