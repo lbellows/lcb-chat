@@ -1,0 +1,17 @@
+services:
+  chat:
+    build: .
+    image: lcb-chat
+    container_name: lcb-chat
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # SQLite database lives on the named volume below, so messages survive
+      # `docker compose up --build` and container replacement.
+      DB_PATH: /data/chat.db
+    volumes:
+      - chat-data:/data
+
+volumes:
+  chat-data:

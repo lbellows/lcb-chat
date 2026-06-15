@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Family Chat</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Username picker -->
+    <div id="login" class="overlay">
+      <form id="login-form" class="card">
+        <h1>Family Chat</h1>
+        <p>Pick a name to join the chat.</p>
+        <input
+          id="username-input"
+          type="text"
+          placeholder="Your name"
+          maxlength="32"
+          autocomplete="off"
+          required
+        />
+        <button type="submit">Join</button>
+      </form>
+    </div>
+
+    <!-- Chat -->
+    <div id="chat" class="hidden">
+      <header>
+        <span class="title">Family Chat</span>
+        <span id="status" class="status">connecting…</span>
+        <button id="change-name" title="Change name">✎</button>
+      </header>
+      <div id="messages">
+        <button id="load-more" class="hidden">Load older messages</button>
+      </div>
+      <form id="message-form">
+        <input
+          id="message-input"
+          type="text"
+          placeholder="Type a message…"
+          maxlength="2000"
+          autocomplete="off"
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
