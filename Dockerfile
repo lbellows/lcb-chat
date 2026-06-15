@@ -1,9 +1,9 @@
-FROM node:22-slim
+FROM node:24-slim
 
 WORKDIR /app
 
 # Install deps first for better layer caching. better-sqlite3 ships prebuilt
-# binaries for linux/x64 + linux/arm64, so no build toolchain is needed.
+# binaries for linux/x64 + linux/arm64 (incl. Node 24), so no toolchain needed.
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
