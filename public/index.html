@@ -7,12 +7,15 @@
       content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
     />
     <title>Family Chat</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <!-- Username picker -->
     <div id="login" class="overlay">
       <form id="login-form" class="card">
+        <img class="logo" src="icon.svg" alt="" width="56" height="56" />
         <h1>Family Chat</h1>
         <p>Pick a name to join the chat.</p>
         <input
@@ -30,6 +33,7 @@
     <!-- Chat -->
     <div id="chat" class="hidden">
       <header>
+        <img class="logo" src="icon.svg" alt="" width="24" height="24" />
         <span class="title">Family Chat</span>
         <span id="status" class="status">connecting…</span>
         <button id="change-name" title="Change name">✎</button>
@@ -39,13 +43,13 @@
       </div>
       <div id="typing" class="typing hidden"></div>
       <form id="message-form">
-        <input
+        <textarea
           id="message-input"
-          type="text"
           placeholder="Type a message…"
           maxlength="2000"
           autocomplete="off"
-        />
+          rows="1"
+        ></textarea>
         <button type="submit">Send</button>
       </form>
     </div>

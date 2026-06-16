@@ -198,6 +198,22 @@ function sendTyping(state) {
   ws.send(JSON.stringify({ type: "typing", state }));
 }
 
+// Grow the textarea with its content, up to the CSS max-height.
+function autoResizeInput() {
+  els.messageInput.style.height = "auto";
+  els.messageInput.style.height = `${els.messageInput.scrollHeight}px`;
+}
+
+// Enter sends; Shift+Enter (and pasted text) insert a newline.
+els.messageInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    els.messageForm.requestSubmit();
+  }
+});
+
+els.messageInput.addEventListener("input", autoResizeInput);
+
 els.messageInput.addEventListener("input", () => {
   if (!els.messageInput.value) {
     sendTyping(false);
@@ -218,6 +234,7 @@ els.messageForm.addEventListener("submit", (e) => {
   if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify({ type: "message", text }));
   els.messageInput.value = "";
+  autoResizeInput();
   sendTyping(false);
   lastTypingSent = 0;
 });
