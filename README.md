@@ -20,32 +20,55 @@ npm start
 
 Family members on the same network open `http://<your-machine-ip>:3000`.
 
-## Run with Docker Compose (recommended for the server)
+## Run with Docker (recommended for the server)
 
-```bash
-docker compose up --build -d
+The server runs the **prebuilt image** from GitHub Container Registry — it does
+not build from source. Pushing to `master` triggers a GitHub Actions workflow
+(`.github/workflows/docker-publish.yml`) that builds a multi-arch
+(amd64/arm64) image and publishes `ghcr.io/lbellows/lcb-chat:latest`.
+
+Deploy by adding the service to your Compose stack (this repo's
+`docker-compose.prod.yml` is a standalone example):
+
+```yaml
+chat:
+  image: ghcr.io/lbellows/lcb-chat:latest
+  container_name: lcb-chat
+  restart: unless-stopped
+  pull_policy: always
+  ports:
+    - "3000:3000"
+  environment:
+    DB_PATH: /data/chat.db
+  volumes:
+    - /srv/chat:/data   # host bind mount; the SQLite DB lives here
 ```
 
 Open `http://<server-ip>:3000`.
 
-The SQLite database lives on the `chat-data` named volume, so your message
-history survives rebuilds and updates.
+The SQLite database lives on the host at `/srv/chat/chat.db` (bind mount),
+so your message history survives image updates and container replacement. The
+DB is never baked into the image.
 
 ### Updating
 
+CI publishes a new `:latest` image on every push to `master`. On the server,
+just pull and recreate — no build, no `git pull` needed:
+
 ```bash
-git pull        # or copy the new files over
-docker compose up --build -d
+docker compose pull chat
+docker compose up -d chat
 ```
 
-The container is replaced; the `chat-data` volume (and your history) stays.
+(`pull_policy: always` means a plain `docker compose up -d chat` also pulls.)
+The container is replaced; the bind-mounted DB (and your history) stays.
 
 ### Backups
 
-The whole chat is one SQLite file inside the `chat-data` volume:
+The whole chat is one SQLite file on the host — just copy it:
 
 ```bash
-docker compose cp chat:/data/chat.db ./chat-backup.db
+cp /srv/chat/chat.db ./chat-backup.db
 ```
 
 ## Configuration
