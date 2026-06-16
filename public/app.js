@@ -27,7 +27,24 @@ function showLogin() {
   els.usernameInput.focus();
 }
 
+function reset() {
+  // Tear down any existing session so re-entering (e.g. after a name change)
+  // doesn't duplicate the socket or the rendered history.
+  if (ws) {
+    ws.intentionalClose = true; // suppress the reconnect handler below
+    ws.close();
+    ws = null;
+  }
+  for (const msg of els.messages.querySelectorAll(".msg")) msg.remove();
+  oldestId = null;
+  hasMore = true;
+  for (const id of typers.values()) clearTimeout(id);
+  typers.clear();
+  renderTypers();
+}
+
 function start(name) {
+  reset();
   username = name;
   localStorage.setItem("username", name);
   els.login.classList.add("hidden");
@@ -111,14 +128,15 @@ els.loadMore.addEventListener("click", () => {
 // ---- Live WebSocket ----
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const socket = new WebSocket(`${proto}://${location.host}/ws`);
+  ws = socket;
 
-  ws.addEventListener("open", () => {
+  socket.addEventListener("open", () => {
     els.status.textContent = "connected";
-    ws.send(JSON.stringify({ type: "join", username }));
+    socket.send(JSON.stringify({ type: "join", username }));
   });
 
-  ws.addEventListener("message", (e) => {
+  socket.addEventListener("message", (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "message") {
       const atBottom =
@@ -132,12 +150,13 @@ function connect() {
     }
   });
 
-  ws.addEventListener("close", () => {
+  socket.addEventListener("close", () => {
+    if (socket.intentionalClose) return;
     els.status.textContent = "reconnecting…";
     setTimeout(connect, 1500);
   });
 
-  ws.addEventListener("error", () => ws.close());
+  socket.addEventListener("error", () => socket.close());
 }
 
 // ---- Typing indicator ----

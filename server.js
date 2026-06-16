@@ -33,6 +33,16 @@ const MAX_MESSAGE = 2000;
 wss.on("connection", (ws) => {
   ws.username = null;
 
+  // Heartbeat liveness flag; reset on every pong (see interval below).
+  ws.isAlive = true;
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
+
+  // Without this, a socket 'error' (e.g. ECONNRESET) is unhandled and crashes
+  // the process. The 'close' handling that follows cleans the client up.
+  ws.on("error", () => {});
+
   ws.on("message", (raw) => {
     let msg;
     try {
@@ -77,6 +87,22 @@ wss.on("connection", (ws) => {
     }
   });
 });
+
+// Detect and drop half-open connections so they don't pile up in wss.clients.
+// Each round: terminate anything that didn't pong since last time, then ping.
+const HEARTBEAT_MS = 30_000;
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_MS);
+
+wss.on("close", () => clearInterval(heartbeat));
 
 server.listen(PORT, () => {
   console.log(`lcb-chat listening on http://0.0.0.0:${PORT}`);
