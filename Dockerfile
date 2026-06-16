@@ -9,6 +9,11 @@ RUN npm install --omit=dev
 
 COPY . .
 
+# Image version, surfaced to the client so it can detect when a newer build is
+# deployed. CI passes the git SHA; defaults to "dev" for local builds.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DB_PATH=/data/chat.db

@@ -7,6 +7,9 @@ import { saveMessage, getMessages } from "./db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
+// Build version (git SHA in production, "dev" locally). Sent to each client on
+// connect so it can spot when a newer image is running than the page it loaded.
+const VERSION = process.env.APP_VERSION || "dev";
 
 const app = express();
 app.use(express.static(join(__dirname, "public")));
@@ -32,6 +35,10 @@ const MAX_MESSAGE = 2000;
 
 wss.on("connection", (ws) => {
   ws.username = null;
+
+  // Tell the client which build it's talking to. On a reconnect after the image
+  // was updated, this arrives changed and the client flags an update.
+  ws.send(JSON.stringify({ type: "version", version: VERSION }));
 
   // Heartbeat liveness flag; reset on every pong (see interval below).
   ws.isAlive = true;

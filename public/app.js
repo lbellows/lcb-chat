@@ -21,6 +21,8 @@ let ws = null;
 let oldestId = null; // smallest message id currently shown (for pagination)
 let latestId = null; // largest message id currently shown (for catch-up)
 let hasMore = true;
+let loadedVersion = null; // build version this page loaded against
+let updateWaiting = false; // a newer build is running than this page
 
 // ---- Username ----
 function showLogin() {
@@ -190,9 +192,23 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("online", ensureConnected);
 window.addEventListener("pageshow", ensureConnected);
 
+// A newer build is live than the one this page loaded. Highlight the refresh
+// button so the user knows a reload will pick up the update.
+function markUpdateWaiting() {
+  if (updateWaiting) return;
+  updateWaiting = true;
+  els.reconnect.classList.add("update");
+  els.reconnect.title = "Update available — click to reload";
+}
+
 // Manual refresh: catch up immediately, then force a clean socket in case the
-// current one is silently half-dead.
+// current one is silently half-dead. If a new build is waiting, a socket
+// reconnect won't pick up new frontend code — do a full page reload instead.
 function manualRefresh() {
+  if (updateWaiting) {
+    location.reload();
+    return;
+  }
   if (!username) return;
   catchUp();
   if (ws) {
@@ -236,6 +252,11 @@ function connect() {
       alertMessage(msg);
     } else if (msg.type === "typing") {
       setTyping(msg.username, msg.state);
+    } else if (msg.type === "version") {
+      // First version seen is our baseline; a later, different one means the
+      // server was redeployed under us.
+      if (loadedVersion === null) loadedVersion = msg.version;
+      else if (msg.version !== loadedVersion) markUpdateWaiting();
     }
   });
 

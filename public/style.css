@@ -119,6 +119,31 @@ header .status {
   line-height: 1;
 }
 
+/* A newer build is deployed than the page is running — draw attention to the
+   refresh button, which now reloads to pick up the update. */
+#reconnect.update {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent);
+  animation: update-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes update-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 140, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(79, 140, 255, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #reconnect.update {
+    animation: none;
+  }
+}
+
 #messages {
   flex: 1;
   overflow-y: auto;
