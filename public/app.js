@@ -255,7 +255,8 @@ const typers = new Map();
 function renderTypers() {
   const names = [...typers.keys()];
   if (!names.length) {
-    els.typing.classList.add("hidden");
+    // Keep the strip in the layout (space stays reserved) — just clear it so
+    // showing/hiding never resizes the scrollable message list.
     els.typing.textContent = "";
     return;
   }
@@ -264,7 +265,6 @@ function renderTypers() {
   else if (names.length === 2) label = `${names[0]} and ${names[1]} are typing…`;
   else label = "Several people are typing…";
   els.typing.textContent = label;
-  els.typing.classList.remove("hidden");
 }
 
 function setTyping(name, on) {
