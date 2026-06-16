@@ -24,8 +24,11 @@ body {
   background: var(--bg);
   color: var(--text);
   /* Lock the page to the visible viewport so only #messages scrolls.
-     dvh tracks the dynamic viewport (excludes mobile browser chrome). */
+     dvh tracks the dynamic viewport (excludes mobile browser chrome);
+     --app-height is set from visualViewport in app.js so the soft
+     keyboard shrinks the app instead of overlaying / scrolling it. */
   height: 100dvh;
+  height: var(--app-height, 100dvh);
   overflow: hidden;
 }
 
@@ -70,6 +73,7 @@ body {
   flex-direction: column;
   height: 100%; /* fallback for browsers without dvh */
   height: 100dvh;
+  height: var(--app-height, 100dvh);
   max-width: 800px;
   margin: 0 auto;
 }

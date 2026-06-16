@@ -222,6 +222,26 @@ els.messageForm.addEventListener("submit", (e) => {
   lastTypingSent = 0;
 });
 
+// ---- Viewport height (mobile keyboard) ----
+// On Android the soft keyboard overlays the page rather than resizing it, so
+// 100dvh stays full-screen and the app appears too tall / scrollable. Track the
+// visualViewport height instead and expose it as --app-height; keep the latest
+// message pinned above the input when the viewport shrinks.
+function syncViewportHeight() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const m = els.messages;
+  const atBottom = m.scrollHeight - m.scrollTop - m.clientHeight < 80;
+  document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
+  if (atBottom) m.scrollTop = m.scrollHeight;
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", syncViewportHeight);
+  window.visualViewport.addEventListener("scroll", syncViewportHeight);
+  syncViewportHeight();
+}
+
 // ---- Boot ----
 if (username) {
   start(username);
