@@ -7,12 +7,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # SQLite database lives on the named volume below, so messages survive
-      # image updates and container replacement. The DB is NEVER baked into the
-      # image — it only exists on this volume on the server.
       DB_PATH: /data/chat.db
     volumes:
-      - chat-data:/data
-
-volumes:
-  chat-data:
+      # Bind mount on the host. The SQLite DB lives at <host path>/chat.db and
+      # survives image updates and container replacement. The DB is NEVER baked
+      # into the image — it only exists in this folder on the server.
+      # Change the host path to wherever you keep service data, e.g. /srv/chat.
+      - ./data:/data
