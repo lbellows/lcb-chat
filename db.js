@@ -39,13 +39,25 @@ const beforeStmt = db.prepare(`
   LIMIT ?
 `);
 
+// Messages newer than `after`, oldest-first — used to catch up on whatever
+// arrived while a client was disconnected (idle tab, dropped socket).
+const afterStmt = db.prepare(`
+  SELECT id, username, text, ts FROM messages
+  WHERE id > ?
+  ORDER BY id ASC
+  LIMIT ?
+`);
+
 export function saveMessage({ username, text, ts }) {
   const info = insertStmt.run(username, text, ts);
   return { id: info.lastInsertRowid, username, text, ts };
 }
 
-export function getMessages({ before, limit = 50 } = {}) {
+export function getMessages({ before, after, limit = 50 } = {}) {
   limit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  if (after) {
+    return afterStmt.all(Number(after), limit); // already oldest-first
+  }
   const rows = before
     ? beforeStmt.all(Number(before), limit)
     : recentStmt.all(limit);

@@ -106,13 +106,17 @@ header .status {
   margin-left: auto;
 }
 
-#change-name {
+#change-name,
+#mute,
+#reconnect {
   background: transparent;
   border: 1px solid var(--panel-2);
   color: var(--muted);
   width: 2rem;
   height: 2rem;
   padding: 0;
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 #messages {

@@ -13,8 +13,8 @@ app.use(express.static(join(__dirname, "public")));
 
 // Lazy-loaded message history. Newest-first cursor via ?before=<id>.
 app.get("/api/messages", (req, res) => {
-  const { before, limit } = req.query;
-  res.json(getMessages({ before, limit }));
+  const { before, after, limit } = req.query;
+  res.json(getMessages({ before, after, limit }));
 });
 
 const server = createServer(app);

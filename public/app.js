@@ -6,6 +6,8 @@ const els = {
   usernameInput: document.getElementById("username-input"),
   chat: document.getElementById("chat"),
   status: document.getElementById("status"),
+  reconnect: document.getElementById("reconnect"),
+  mute: document.getElementById("mute"),
   changeName: document.getElementById("change-name"),
   messages: document.getElementById("messages"),
   loadMore: document.getElementById("load-more"),
@@ -17,6 +19,7 @@ const els = {
 let username = localStorage.getItem("username") || "";
 let ws = null;
 let oldestId = null; // smallest message id currently shown (for pagination)
+let latestId = null; // largest message id currently shown (for catch-up)
 let hasMore = true;
 
 // ---- Username ----
@@ -37,6 +40,7 @@ function reset() {
   }
   for (const msg of els.messages.querySelectorAll(".msg")) msg.remove();
   oldestId = null;
+  latestId = null;
   hasMore = true;
   for (const id of typers.values()) clearTimeout(id);
   typers.clear();
@@ -50,6 +54,10 @@ function start(name) {
   els.login.classList.add("hidden");
   els.chat.classList.remove("hidden");
   els.messageInput.focus();
+  if (!muted) {
+    unlockAudio();
+    ensureNotifyPermission();
+  }
   loadHistory().then(connect);
 }
 
@@ -116,6 +124,7 @@ async function loadHistory(before) {
   } else {
     for (const m of msgs) renderMessage(m);
     els.messages.scrollTop = els.messages.scrollHeight;
+    latestId = msgs[msgs.length - 1].id; // newest (msgs are oldest-first)
   }
 
   oldestId = msgs[0].id;
@@ -124,6 +133,78 @@ async function loadHistory(before) {
 els.loadMore.addEventListener("click", () => {
   if (oldestId) loadHistory(oldestId);
 });
+
+// Fetch every message newer than the newest one we're showing and append it.
+// Used after a (re)connect or when the tab wakes up, so a dropped/idle socket
+// doesn't leave a gap. Loops in case the backlog exceeds one page.
+let catchingUp = false;
+async function catchUp() {
+  if (latestId === null || catchingUp) return;
+  catchingUp = true;
+  try {
+    const m = els.messages;
+    const atBottom = m.scrollHeight - m.scrollTop - m.clientHeight < 80;
+    let added = 0;
+    while (true) {
+      const url = new URL("/api/messages", location.origin);
+      url.searchParams.set("after", latestId);
+      url.searchParams.set("limit", PAGE_SIZE);
+      let msgs;
+      try {
+        const res = await fetch(url);
+        msgs = await res.json();
+      } catch {
+        break; // offline / server unreachable; try again on next trigger
+      }
+      if (!Array.isArray(msgs) || !msgs.length) break;
+      for (const msg of msgs) {
+        if (msg.id <= latestId) continue;
+        renderMessage(msg);
+        latestId = msg.id;
+        added++;
+      }
+      if (msgs.length < PAGE_SIZE) break; // drained the backlog
+    }
+    if (added && atBottom) m.scrollTop = m.scrollHeight;
+  } finally {
+    catchingUp = false;
+  }
+}
+
+// Make sure we have a live socket and have caught up. A backgrounded mobile tab
+// often freezes the socket without firing 'close', so on resume we reconnect if
+// it looks dead, or just catch up if it's still open.
+function ensureConnected() {
+  if (!username) return;
+  if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+    connect();
+  } else if (ws.readyState === WebSocket.OPEN) {
+    catchUp();
+  }
+  // CONNECTING: leave it; its open handler will catch up.
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") ensureConnected();
+});
+window.addEventListener("online", ensureConnected);
+window.addEventListener("pageshow", ensureConnected);
+
+// Manual refresh: catch up immediately, then force a clean socket in case the
+// current one is silently half-dead.
+function manualRefresh() {
+  if (!username) return;
+  catchUp();
+  if (ws) {
+    ws.intentionalClose = true;
+    ws.close();
+    ws = null;
+  }
+  els.status.textContent = "reconnecting…";
+  connect();
+}
+
+els.reconnect.addEventListener("click", manualRefresh);
 
 // ---- Live WebSocket ----
 function connect() {
@@ -134,17 +215,25 @@ function connect() {
   socket.addEventListener("open", () => {
     els.status.textContent = "connected";
     socket.send(JSON.stringify({ type: "join", username }));
+    // Pull anything that arrived while we were disconnected — the fresh socket
+    // only carries future messages, not the gap.
+    catchUp();
   });
 
   socket.addEventListener("message", (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "message") {
+      // Skip anything we've already shown (e.g. delivered by a concurrent
+      // catch-up fetch); ids are monotonic so this is a safe dedup.
+      if (latestId !== null && msg.id <= latestId) return;
       const atBottom =
         els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 80;
       renderMessage(msg);
       if (oldestId === null) oldestId = msg.id;
+      latestId = msg.id;
       if (atBottom) els.messages.scrollTop = els.messages.scrollHeight;
       setTyping(msg.username, false); // they just sent, so they stopped typing
+      alertMessage(msg);
     } else if (msg.type === "typing") {
       setTyping(msg.username, msg.state);
     }
@@ -258,6 +347,98 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener("scroll", syncViewportHeight);
   syncViewportHeight();
 }
+
+// ---- Notifications & sound ----
+// Alerts on other people's messages: a short ping when the chat tab is focused,
+// an OS Notification (with its own sound) when it isn't. Muteable; state in
+// localStorage.
+let muted = localStorage.getItem("muted") === "1";
+
+// Web Audio "ping". The context starts suspended until a user gesture unlocks
+// it (browser autoplay policy), so we prime it on first interaction / on join.
+let audioCtx = null;
+function unlockAudio() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = new Ctx();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playPing() {
+  if (!audioCtx) return; // not unlocked yet
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(880, now);
+  osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.32);
+}
+
+function ensureNotifyPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+function alertMessage(msg) {
+  if (muted || msg.username === username) return;
+  const focused = document.visibilityState === "visible" && document.hasFocus();
+  if (focused) {
+    playPing();
+    return;
+  }
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      const n = new Notification(msg.username, {
+        body: msg.text.slice(0, 120),
+        icon: "icon.svg",
+        tag: "lcb-chat", // collapse rapid messages into one banner
+      });
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+      return;
+    } catch {
+      // fall through to sound
+    }
+  }
+  playPing(); // unfocused but no notification permission
+}
+
+function renderMute() {
+  els.mute.textContent = muted ? "🔕" : "🔔";
+  els.mute.title = muted ? "Unmute sounds" : "Mute sounds";
+}
+
+els.mute.addEventListener("click", () => {
+  muted = !muted;
+  localStorage.setItem("muted", muted ? "1" : "0");
+  renderMute();
+  if (!muted) {
+    unlockAudio();
+    ensureNotifyPermission();
+  }
+});
+renderMute();
+
+// Unlock audio on the first interaction (covers an auto-rejoin where no gesture
+// has happened yet); the join click also unlocks below.
+function primeAudioOnce() {
+  unlockAudio();
+  window.removeEventListener("pointerdown", primeAudioOnce);
+  window.removeEventListener("keydown", primeAudioOnce);
+}
+window.addEventListener("pointerdown", primeAudioOnce);
+window.addEventListener("keydown", primeAudioOnce);
 
 // ---- Boot ----
 if (username) {
