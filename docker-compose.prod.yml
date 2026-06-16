@@ -12,5 +12,5 @@ services:
       # Bind mount on the host. The SQLite DB lives at <host path>/chat.db and
       # survives image updates and container replacement. The DB is NEVER baked
       # into the image — it only exists in this folder on the server.
-      # Change the host path to wherever you keep service data, e.g. /srv/chat.
+      # Change the host path to wherever you keep service data, e.g. /srv/<app>.
       - ./data:/data
