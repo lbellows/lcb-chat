@@ -84,27 +84,43 @@ This is intentionally trust-based — anyone who can reach the port can pick any
 name and post. That's fine for a LAN among family. **Do not expose it directly to
 the public internet** without putting auth / a gate in front (see below).
 
-## Public / remote access (future)
+## Remote access: open on the LAN, gated by Cloudflare Access
 
-The app has no login of its own, so the safe way to reach it from outside the LAN
-is to make sure only trusted devices/people can get to it in the first place.
-Two good options, in order of safety:
+`docker-compose.prod.yml` runs two services that give you two doors to the same app:
 
-- **Tailscale (or WireGuard) — safest.** The chat stays entirely private; nothing
-  is exposed to the internet. A device must be on the VPN to even see `:3000`.
-  Each family member installs the client once and signs in (Tailscale uses
-  Google/Microsoft identity, no port forwarding, MagicDNS gives you `http://<server>:3000`).
-  Because only enrolled devices can reach it, the app's missing auth stops mattering.
-- **Cloudflare Tunnel + Cloudflare Access — good, browser-only.** Run `cloudflared`
-  on the server pointing at `localhost:3000` to get `https://chat.<domain>` with a
-  valid auto-renewing cert and no port forwarding. Put **Cloudflare Access** in front
-  so only verified family logins (email code, Google, etc.) reach the app — the edge
-  is the wall. Nothing to install for family; note TLS terminates at Cloudflare, so
-  they're a trusted party in the path. **Never use a bare tunnel without Access** — that
-  puts an unauthenticated app on the open internet.
+- **LAN (open, no login):** the `chat` service publishes `3000` on the host, so
+  family at home just open `http://<server>:3000`. This stays safe only because it
+  isn't internet-routable — **do not port-forward `3000` on your router.**
+- **Remote (Cloudflare Access login):** the `cloudflared` sidecar opens an
+  **outbound-only** tunnel — no inbound ports — and Cloudflare serves
+  `https://chat.example.com` with an auto-renewing cert. **Cloudflare Access**
+  sits in front so only verified family logins (email one-time PIN, Google, etc.)
+  reach the app. Since the app has no login of its own, **that Access policy is the
+  wall** — never run the tunnel without it.
 
-The WebSocket client already upgrades to `wss://` automatically when the page is
-served over HTTPS, so either option works with no code change.
+Both doors hit the same unauthenticated app; the only *public* door is the
+Access-gated one. The WebSocket client upgrades to `wss://` automatically over
+HTTPS, and Access proxies the `/ws` upgrade, so no code change is needed.
+Cloudflare Tunnel is free, and Access is free for up to 50 users.
+
+### Cloudflare setup
+
+The tunnel `lcb-chat` and its public hostname (`chat.example.com → http://chat:3000`)
+are created in Cloudflare. To bring it up:
+
+1. The connector token is in `.env` (gitignored). Copy that `.env` to the server
+   next to `docker-compose.prod.yml`.
+2. Make sure a **Cloudflare Access** application protects `chat.example.com` with a
+   policy allowing your family's emails (One-time PIN is the simplest start). This
+   is the wall — do not start the tunnel until it exists.
+3. `docker compose -f docker-compose.prod.yml up -d`.
+
+Defense-in-depth note: Access is enforced at Cloudflare's edge, not re-checked by
+the app, and TLS terminates at Cloudflare — fine for a family chat.
+
+> Prefer a fully-private setup with no public hostname at all? **Tailscale/WireGuard**
+> is the safest alternative: the chat never touches the internet and a device must be
+> on the VPN to see `:3000`. Trade-off is each family member installs a VPN client.
 
 ## If you ever outgrow the single box (managed hosting)
 

@@ -4,6 +4,10 @@ services:
     container_name: lcb-chat
     restart: unless-stopped
     pull_policy: always
+    # Published to the host so the LAN can reach it directly with no auth:
+    # http://<server-ip>:3000. This is the intentionally-open "home" door.
+    # Do NOT port-forward this on your router — the only public door is the
+    # Cloudflare tunnel below, which is gated by Cloudflare Access.
     ports:
       - "3000:3000"
     environment:
@@ -14,3 +18,25 @@ services:
       # into the image — it only exists in this folder on the server.
       # Change the host path to wherever you keep service data, e.g. /srv/<app>.
       - ./data:/data
+
+  # Outbound-only tunnel to Cloudflare — opens NO inbound ports on the host.
+  # Remote access goes: browser -> Cloudflare edge (Access login) -> this tunnel
+  # -> http://chat:3000 (over the compose network, not the published host port).
+  #
+  # The tunnel "lcb-chat" and its public hostname (chat.example.com -> http://chat:3000)
+  # are created in Cloudflare. To run it here you only need the connector
+  # token in a .env file next to this compose file:  TUNNEL_TOKEN=...
+  # (see .env.example; .env is gitignored & dockerignored — the token is a secret.)
+  #
+  # SAFETY: chat.example.com must be protected by a Cloudflare Access application
+  # before it goes live, or the app is unauthenticated on the open internet — the
+  # Access policy IS the wall, since the app has no login of its own.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: lcb-chat-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env (see .env.example)}
+    depends_on:
+      - chat
