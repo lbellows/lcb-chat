@@ -18,9 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -35,7 +32,9 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          # amd64 only — the server is x86. Adding linux/arm64 back means
+          # re-adding the QEMU setup step above.
+          platforms: linux/amd64
           push: true
           build-args: |
             APP_VERSION=${{ github.sha }}

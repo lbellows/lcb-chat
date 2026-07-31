@@ -24,8 +24,8 @@ Family members on the same network open `http://<your-machine-ip>:3000`.
 
 The server runs the **prebuilt image** from GitHub Container Registry — it does
 not build from source. Pushing to `master` triggers a GitHub Actions workflow
-(`.github/workflows/docker-publish.yml`) that builds a multi-arch
-(amd64/arm64) image and publishes `ghcr.io/lbellows/lcb-chat:latest`.
+(`.github/workflows/docker-publish.yml`) that builds a `linux/amd64`
+image and publishes `ghcr.io/lbellows/lcb-chat:latest`.
 
 Deploy by adding the service to your Compose stack (this repo's
 `docker-compose.prod.yml` is a standalone example):
