@@ -114,6 +114,14 @@ are created in Cloudflare. To bring it up:
    policy allowing your family's emails (One-time PIN is the simplest start). This
    is the wall — do not start the tunnel until it exists.
 3. `docker compose -f docker-compose.prod.yml up -d`.
+4. **Stay logged in longer.** Access re-prompts for a login every 24 hours by
+   default. Raise the app's Configure > Overview > **Session Duration** (max is
+   `1 month`). The global session duration (Zero Trust > Access controls >
+   **Access settings**) is set to *Same as application session timeout*, so it
+   follows the app — no separate change needed. A policy with its own session
+   duration would override the application, so check that if the app setting
+   doesn't take. Longer sessions mean a lost device keeps access until you
+   revoke the user's sessions in Zero Trust.
 
 Defense-in-depth note: Access is enforced at Cloudflare's edge, not re-checked by
 the app, and TLS terminates at Cloudflare — fine for a family chat.
