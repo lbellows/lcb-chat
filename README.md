@@ -41,14 +41,15 @@ chat:
   environment:
     DB_PATH: /data/chat.db
   volumes:
-    - /srv/chat:/data   # host bind mount; the SQLite DB lives here
+    - ./data:/data   # host bind mount; the SQLite DB lives here
 ```
 
 Open `http://<server-ip>:3000`.
 
-The SQLite database lives on the host at `/srv/chat/chat.db` (bind mount),
+The SQLite database lives on the host at `./data/chat.db` (bind mount),
 so your message history survives image updates and container replacement. The
-DB is never baked into the image.
+DB is never baked into the image. Change the host path to wherever you keep
+service data (for example `/srv/chat`).
 
 ### Updating
 
@@ -68,7 +69,7 @@ The container is replaced; the bind-mounted DB (and your history) stays.
 The whole chat is one SQLite file on the host — just copy it:
 
 ```bash
-cp /srv/chat/chat.db ./chat-backup.db
+cp data/chat.db ./chat-backup.db
 ```
 
 ## Configuration
@@ -92,11 +93,11 @@ the public internet** without putting auth / a gate in front (see below).
   family at home just open `http://<server>:3000`. This stays safe only because it
   isn't internet-routable — **do not port-forward `3000` on your router.**
 - **Remote (Cloudflare Access login):** the `cloudflared` sidecar opens an
-  **outbound-only** tunnel — no inbound ports — and Cloudflare serves
-  `https://chat.example.com` with an auto-renewing cert. **Cloudflare Access**
-  sits in front so only verified family logins (email one-time PIN, Google, etc.)
-  reach the app. Since the app has no login of its own, **that Access policy is the
-  wall** — never run the tunnel without it.
+  **outbound-only** tunnel — no inbound ports — and Cloudflare serves your
+  hostname (for example `https://chat.example.com`) with an auto-renewing cert.
+  **Cloudflare Access** sits in front so only verified family logins (email
+  one-time PIN, Google, etc.) reach the app. Since the app has no login of its
+  own, **that Access policy is the wall** — never run the tunnel without it.
 
 Both doors hit the same unauthenticated app; the only *public* door is the
 Access-gated one. The WebSocket client upgrades to `wss://` automatically over
@@ -105,12 +106,14 @@ Cloudflare Tunnel is free, and Access is free for up to 50 users.
 
 ### Cloudflare setup
 
-The tunnel `lcb-chat` and its public hostname (`chat.example.com → http://chat:3000`)
-are created in Cloudflare. To bring it up:
+Create a Cloudflare Tunnel and a public hostname that points at the `chat`
+service on the Compose network (for example `chat.example.com → http://chat:3000`).
+Then:
 
-1. The connector token is in `.env` (gitignored). Copy that `.env` to the server
-   next to `docker-compose.prod.yml`.
-2. Make sure a **Cloudflare Access** application protects `chat.example.com` with a
+1. Copy the connector token into `.env` as `TUNNEL_TOKEN` (see `.env.example`;
+   `.env` is gitignored). Put that file next to `docker-compose.prod.yml` on the
+   server.
+2. Create a **Cloudflare Access** application that protects your hostname with a
    policy allowing your family's emails (One-time PIN is the simplest start). This
    is the wall — do not start the tunnel until it exists.
 3. `docker compose -f docker-compose.prod.yml up -d`.

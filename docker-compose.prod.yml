@@ -23,14 +23,16 @@ services:
   # Remote access goes: browser -> Cloudflare edge (Access login) -> this tunnel
   # -> http://chat:3000 (over the compose network, not the published host port).
   #
-  # The tunnel "lcb-chat" and its public hostname (chat.example.com -> http://chat:3000)
-  # are created in Cloudflare. To run it here you only need the connector
-  # token in a .env file next to this compose file:  TUNNEL_TOKEN=...
+  # Create a tunnel and public hostname in Cloudflare Zero Trust
+  # (for example chat.example.com -> http://chat:3000). To run the connector
+  # here you need the token in a .env file next to this compose file:
+  #   TUNNEL_TOKEN=...
   # (see .env.example; .env is gitignored & dockerignored — the token is a secret.)
   #
-  # SAFETY: chat.example.com must be protected by a Cloudflare Access application
-  # before it goes live, or the app is unauthenticated on the open internet — the
-  # Access policy IS the wall, since the app has no login of its own.
+  # SAFETY: the public hostname must be protected by a Cloudflare Access
+  # application before it goes live, or the app is unauthenticated on the open
+  # internet — the Access policy IS the wall, since the app has no login of its
+  # own.
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: lcb-chat-tunnel
